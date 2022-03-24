@@ -129,147 +129,156 @@ def render_function(model_dir):
     
 
     ## render
-    model_ids = os.listdir(model_dir)
+    cats = os.listdir(model_dir)
     # model_ids = os.listdir(model_dir)[::-1]
     # model_ids = os.listdir(model_dir)[8000:8500]
     # model_ids = os.listdir(model_dir)[8500:9000]
     # model_ids = os.listdir(model_dir)[8500:]
     # model_ids = ['M001361.obj', 'M002909.obj', 'M000001.obj', 'M000002.obj', 'M000003.obj', 'M000022.obj', 'M000015.obj', 'M003339.obj']
-    for index, model_id in enumerate(model_ids):
-        save_dir = os.path.join(args.output_folder, model_id)
-        if os.path.exists(save_dir):
+    for cat in cats:
+        if not os.path.isdir(os.path.join(model_dir, cat)): 
             continue
-        else:
-            obj_file = os.path.join(model_dir, model_id, model_id+'.obj')
-            os.makedirs(save_dir)
-
-            try: bpy.ops.import_scene.obj(filepath=obj_file)
-            except: continue
-            
-            # bpy.context.scene.render.engine = 'BLENDER_EEVEE'
-
-            # for object in bpy.context.scene.objects:
-            #     print(object.name)
-            #     # print('***debug***')
-            #     # print(dir(object))
-            #     if object.name in ['Camera']:
-            #         object.select = False
-            #     else:
-            #         object.select = False
-            #         object.cycles_visibility.shadow = False
-
-                    # for edge in object.data.edges:
-                    #     edge.use_freestyle_mark = True
-                    # #show the marked edges
-                    # object.data.show_freestyle_edge_marks = True
-            
-            # input('debug:hhh')
-
-            bpy.data.worlds['World'].use_nodes = True
-            bpy.data.worlds['World'].node_tree.nodes['Background'].inputs[0].default_value = (1, 1, 1, 1)
-            
-            def parent_obj_to_camera(b_camera):
-                origin = (0, 0, 0)
-                b_empty = bpy.data.objects.new("Empty", None)
-                b_empty.location = origin
-                b_camera.parent = b_empty  # setup parenting
-
-                scn = bpy.context.scene
-                scn.collection.objects.link(b_empty)
-                bpy.context.view_layer.objects.active = b_empty
-                return b_empty
-
-            scene = bpy.context.scene
-            bpy.context.scene.cycles.samples = 20
-            scene.render.resolution_x = 224 # 384
-            scene.render.resolution_y = 224
-            scene.render.resolution_percentage = 100
-            # scene.render.alpha_mode = 'TRANSPARENT'
-            # scene.render.film_transparent = False
-            cam = scene.objects['Camera']
-            # cam.location = (0, 3.2, 0.8) # modified
-            # cam.location = (0, 2.8, 0.6) # MODIFIED
-            cam.location = (0, 0, 5) # MODIFIED
-            cam.data.lens = 35
-            # cam.location = (0, 0, 3.2) # MODIFIED
-            # cam.data.angle = 0.9799147248268127
-            cam_constraint = cam.constraints.new(type='TRACK_TO')
-            cam_constraint.track_axis = 'TRACK_NEGATIVE_Z'
-            cam_constraint.up_axis = 'UP_Y'
-            b_empty = parent_obj_to_camera(cam)
-            cam_constraint.target = b_empty
-
-            world = bpy.data.worlds['World']
-            world.light_settings.use_ambient_occlusion = True
-            world.light_settings.ao_factor = 0.6
-            
-            fp = args.output_folder
-            scene.render.image_settings.file_format = 'PNG'  # set output format to .png
-
-            
-            rotation_mode = 'XYZ'
-
-            for output_node in [depth_file_output, normal_file_output, albedo_file_output, sc_file_output, fs_output]:
-                output_node.base_path = ''
-
-            # b_empty.rotation_euler[2] += radians(330)
-            
-            # render image by views
-            pose_dict = {}
-
-            cur_obj = bpy.data.objects[model_id] #bpy.context.selected_objects[0]
-
-
-            # some bugs in blender freestyle rendering (camera views not sync)
-            # 0 -> x, 1 -> y, 2 -> z
-            cur_obj.rotation_euler[0] -= radians(90)
-
-            cur_obj.rotation_euler[0] -= radians(12)
-            cur_obj.rotation_euler[1] -= radians(12)
-            cur_obj.rotation_euler[2] -= radians(15)
-
-            # v_num = args.views
-            for j in range(3):
-                cur_obj.rotation_euler[j] -= radians(30)
-                v_num = 4
-                stepsize = 360.0 / v_num   # 45 degrees
-                for i in range(v_num):
-                    print("Rotation {}, {}".format((stepsize * i), radians(stepsize * i)))
-                    
-                    # scene.render.filepath = os.path.join(save_dir, 'image_' + '{0:02d}'.format(int(i * stepsize)))                              # rgb
-                    # scene.render.filepath = os.path.join(save_dir, 'o'+'{0:02d}'.format(j*4+i))                            # rgb
-
-                    # depth_file_output.file_slots[0].path = os.path.join(save_dir, 'depth_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # depth
-                    # normal_file_output.file_slots[0].path = os.path.join(save_dir, 'normal_' + '{0:03d}'.format(int(i * stepsize)) + '_')       # normal
-                    # albedo_file_output.file_slots[0].path = os.path.join(save_dir, 'mask_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # mask
-                    # sc_file_output.file_slots[0].path = os.path.join(save_dir, 'sc_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # sc
-                    # fs_output.file_slots[0].path = os.path.join(save_dir, 'hh_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # fs
-                    
-                    fs_output.file_slots[0].path = os.path.join(save_dir, '{0:02d}_#.png'.format(j*4+i))
-
-                    bpy.ops.render.render(animation=False, write_still=True, layer='Freestyle')  # render still
-                    # b_empty.rotation_euler[2] += radians(stepsize)
-                    cur_obj.rotation_euler[j] += radians(stepsize)
-
-                cur_obj.rotation_euler[j] += radians(30)
-                # break
-            for i in range(12):
-                os.system('mv %s %s'%(os.path.join(save_dir, '{0:02d}_1.png'.format(i)),os.path.join(save_dir, '{0:02d}.png'.format(i))))
-            
-            # clear sys
-            # obj = bpy.context.selected_objects[0]
-            # print(obj.name)
-            # print('----')
-            for object in bpy.context.scene.objects:
-                print(object.name)
-                if object.name in ['Camera']:
-                    object.select_set(False)
+        model_ids = os.listdir(os.path.join(model_dir, cat))
+        for model_id in model_ids:
+            part_files = list(filter(lambda x: x[-8:] == "_reg.obj",os.listdir(os.path.join(model_dir, cat, model_id, "reg"))))
+            for part_file in part_files:
+                part_id = part_file[:-8]
+                part_file = part_file[:-4]
+                save_dir = os.path.join(args.output_folder, cat, model_id, "render_img", part_id)
+                if os.path.exists(save_dir):
                     continue
                 else:
-                    object.select_set(True)
-            bpy.ops.object.delete() 
+                    obj_file = os.path.join(model_dir, cat, model_id, "reg", part_file + ".obj")
+                    os.makedirs(save_dir)
 
-            # input('debug')
+                    try: bpy.ops.import_scene.obj(filepath=obj_file)
+                    except: continue
+                    
+                    # bpy.context.scene.render.engine = 'BLENDER_EEVEE'
+
+                    # for object in bpy.context.scene.objects:
+                    #     print(object.name)
+                    #     # print('***debug***')
+                    #     # print(dir(object))
+                    #     if object.name in ['Camera']:
+                    #         object.select = False
+                    #     else:
+                    #         object.select = False
+                    #         object.cycles_visibility.shadow = False
+
+                            # for edge in object.data.edges:
+                            #     edge.use_freestyle_mark = True
+                            # #show the marked edges
+                            # object.data.show_freestyle_edge_marks = True
+                    
+                    # input('debug:hhh')
+
+                    bpy.data.worlds['World'].use_nodes = True
+                    bpy.data.worlds['World'].node_tree.nodes['Background'].inputs[0].default_value = (1, 1, 1, 1)
+                    
+                    def parent_obj_to_camera(b_camera):
+                        origin = (0, 0, 0)
+                        b_empty = bpy.data.objects.new("Empty", None)
+                        b_empty.location = origin
+                        b_camera.parent = b_empty  # setup parenting
+
+                        scn = bpy.context.scene
+                        scn.collection.objects.link(b_empty)
+                        bpy.context.view_layer.objects.active = b_empty
+                        return b_empty
+
+                    scene = bpy.context.scene
+                    bpy.context.scene.cycles.samples = 20
+                    scene.render.resolution_x = 224 # 384
+                    scene.render.resolution_y = 224
+                    scene.render.resolution_percentage = 100
+                    # scene.render.alpha_mode = 'TRANSPARENT'
+                    # scene.render.film_transparent = False
+                    cam = scene.objects['Camera']
+                    # cam.location = (0, 3.2, 0.8) # modified
+                    # cam.location = (0, 2.8, 0.6) # MODIFIED
+                    cam.location = (0, 0, 1) # MODIFIED
+                    cam.data.lens = 35
+                    # cam.location = (0, 0, 3.2) # MODIFIED
+                    # cam.data.angle = 0.9799147248268127
+                    cam_constraint = cam.constraints.new(type='TRACK_TO')
+                    cam_constraint.track_axis = 'TRACK_NEGATIVE_Z'
+                    cam_constraint.up_axis = 'UP_Y'
+                    b_empty = parent_obj_to_camera(cam)
+                    cam_constraint.target = b_empty
+
+                    world = bpy.data.worlds['World']
+                    world.light_settings.use_ambient_occlusion = True
+                    world.light_settings.ao_factor = 0.6
+                    
+                    fp = args.output_folder
+                    scene.render.image_settings.file_format = 'PNG'  # set output format to .png
+
+                    
+                    rotation_mode = 'XYZ'
+
+                    for output_node in [depth_file_output, normal_file_output, albedo_file_output, sc_file_output, fs_output]:
+                        output_node.base_path = ''
+
+                    # b_empty.rotation_euler[2] += radians(330)
+                    
+                    # render image by views
+                    pose_dict = {}
+
+                    print(bpy.data.objects.keys())
+                    cur_obj = bpy.data.objects[part_file] #bpy.context.selected_objects[0]
+
+
+                    # some bugs in blender freestyle rendering (camera views not sync)
+                    # 0 -> x, 1 -> y, 2 -> z
+                    cur_obj.rotation_euler[0] -= radians(90)
+
+                    cur_obj.rotation_euler[0] -= radians(12)
+                    cur_obj.rotation_euler[1] -= radians(12)
+                    cur_obj.rotation_euler[2] -= radians(15)
+
+                    # v_num = args.views
+                    for j in range(3):
+                        cur_obj.rotation_euler[j] -= radians(30)
+                        v_num = 4
+                        stepsize = 360.0 / v_num   # 45 degrees
+                        for i in range(v_num):
+                            print("Rotation {}, {}".format((stepsize * i), radians(stepsize * i)))
+                            
+                            # scene.render.filepath = os.path.join(save_dir, 'image_' + '{0:02d}'.format(int(i * stepsize)))                              # rgb
+                            # scene.render.filepath = os.path.join(save_dir, 'o'+'{0:02d}'.format(j*4+i))                            # rgb
+
+                            # depth_file_output.file_slots[0].path = os.path.join(save_dir, 'depth_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # depth
+                            # normal_file_output.file_slots[0].path = os.path.join(save_dir, 'normal_' + '{0:03d}'.format(int(i * stepsize)) + '_')       # normal
+                            # albedo_file_output.file_slots[0].path = os.path.join(save_dir, 'mask_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # mask
+                            # sc_file_output.file_slots[0].path = os.path.join(save_dir, 'sc_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # sc
+                            # fs_output.file_slots[0].path = os.path.join(save_dir, 'hh_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # fs
+                            
+                            fs_output.file_slots[0].path = os.path.join(save_dir, '{0:02d}_#.png'.format(j*4+i))
+
+                            bpy.ops.render.render(animation=False, write_still=True, layer='Freestyle')  # render still
+                            # b_empty.rotation_euler[2] += radians(stepsize)
+                            cur_obj.rotation_euler[j] += radians(stepsize)
+
+                        cur_obj.rotation_euler[j] += radians(30)
+                        # break
+                    for i in range(12):
+                        os.system('mv %s %s'%(os.path.join(save_dir, '{0:02d}_1.png'.format(i)),os.path.join(save_dir, '{0:02d}.png'.format(i))))
+                    
+                    # clear sys
+                    # obj = bpy.context.selected_objects[0]
+                    # print(obj.name)
+                    # print('----')
+                    for object in bpy.context.scene.objects:
+                        print(object.name)
+                        if object.name in ['Camera']:
+                            object.select_set(False)
+                            continue
+                        else:
+                            object.select_set(True)
+                    bpy.ops.object.delete() 
+
+                    # input('debug')
 
 ###### render model images
 if __name__ == '__main__':
@@ -299,5 +308,6 @@ if __name__ == '__main__':
     argv = sys.argv[sys.argv.index("--") + 1:]
     args = parser.parse_args(argv)
 
-    model_dir = 'norm_part/'
+    # model_dir = '/mnt/3/yangjie/data/structurenet_hire'
+    model_dir = 'data'
     render_function(model_dir)
