@@ -7,13 +7,14 @@ from multiprocessing import Pool, Process
 import argparse, sys, os, time
 import logging
 import numpy as np
-import math
 from math import radians
 
 # logging.basicConfig(filename='log.txt',level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 # logger = logging.getLogger(__name__)
 import bpy
 import pdb
+
+
 
 # render main function
 def render_function(model_dir):
@@ -35,12 +36,12 @@ def render_function(model_dir):
     # bpy.context.scene.render.layers["RenderLayer"].use_pass_environment = True
     # bpy.context.scene.render.layers["RenderLayer"].use_pass_z = True
 
-    bpy.context.scene.view_layers["View Layer"].use_pass_normal = True
-    bpy.context.scene.view_layers["View Layer"].use_pass_environment = True
-    bpy.context.scene.view_layers["View Layer"].use_pass_z = True
-    bpy.context.scene.view_layers["View Layer"].use_freestyle = True
-    bpy.context.scene.view_layers["View Layer"].freestyle_settings.use_suggestive_contours = True
-    bpy.context.scene.view_layers["View Layer"].freestyle_settings.as_render_pass = True
+    bpy.context.scene.view_layers["ViewLayer"].use_pass_normal = True
+    bpy.context.scene.view_layers["ViewLayer"].use_pass_environment = True
+    bpy.context.scene.view_layers["ViewLayer"].use_pass_z = True
+    bpy.context.scene.view_layers["ViewLayer"].use_freestyle = True
+    bpy.context.scene.view_layers["ViewLayer"].freestyle_settings.use_suggestive_contours = True
+    bpy.context.scene.view_layers["ViewLayer"].freestyle_settings.as_render_pass = True
     
     # bpy.context.scene.cycles.device = 'GPU'
     # bpy.context.preferences.addons['cycles'].preferences.compute_device_type = 'CUDA'
@@ -128,18 +129,20 @@ def render_function(model_dir):
     
 
     ## render
-    # model_ids = os.listdir(model_dir)
+    model_ids = os.listdir(model_dir)
     # model_ids = os.listdir(model_dir)[::-1]
     # model_ids = os.listdir(model_dir)[8000:8500]
     # model_ids = os.listdir(model_dir)[8500:9000]
     # model_ids = os.listdir(model_dir)[8500:]
     # model_ids = ['M001361.obj', 'M002909.obj', 'M000001.obj', 'M000002.obj', 'M000003.obj', 'M000022.obj', 'M000015.obj', 'M003339.obj']
     for index, model_id in enumerate(model_ids):
-        model_id = model_id.split('.')[0]
-        if os.path.exists(os.path.join(args.output_folder, model_id)):
+        save_dir = os.path.join(args.output_folder, model_id)
+        if os.path.exists(save_dir):
             continue
         else:
-            obj_file = os.path.join(model_dir, model_id+'.obj')
+            obj_file = os.path.join(model_dir, model_id, model_id+'.obj')
+            os.makedirs(save_dir)
+
             try: bpy.ops.import_scene.obj(filepath=obj_file)
             except: continue
             
@@ -163,7 +166,7 @@ def render_function(model_dir):
             # input('debug:hhh')
 
             bpy.data.worlds['World'].use_nodes = True
-            bpy.data.worlds['World'].node_tree.nodes['Background'].inputs[0].default_value[0:3] = (0.6, 0.6, 0.6)
+            bpy.data.worlds['World'].node_tree.nodes['Background'].inputs[0].default_value = (1, 1, 1, 1)
             
             def parent_obj_to_camera(b_camera):
                 origin = (0, 0, 0)
@@ -178,15 +181,15 @@ def render_function(model_dir):
 
             scene = bpy.context.scene
             bpy.context.scene.cycles.samples = 20
-            scene.render.resolution_x = 256 # 384
-            scene.render.resolution_y = 256
+            scene.render.resolution_x = 224 # 384
+            scene.render.resolution_y = 224
             scene.render.resolution_percentage = 100
             # scene.render.alpha_mode = 'TRANSPARENT'
-            scene.render.film_transparent = True
+            # scene.render.film_transparent = False
             cam = scene.objects['Camera']
             # cam.location = (0, 3.2, 0.8) # modified
             # cam.location = (0, 2.8, 0.6) # MODIFIED
-            cam.location = (0, 0, 3.6) # MODIFIED
+            cam.location = (0, 0, 5) # MODIFIED
             cam.data.lens = 35
             # cam.location = (0, 0, 3.2) # MODIFIED
             # cam.data.angle = 0.9799147248268127
@@ -211,22 +214,10 @@ def render_function(model_dir):
 
             # b_empty.rotation_euler[2] += radians(330)
             
-            cur_obj = bpy.context.selected_objects[0]
             # render image by views
             pose_dict = {}
 
-            ddir = os.path.join(args.output_folder, model_id)
-            # if os.path.exists(ddir) and len(os.listdir(ddir)) == 12:
-            if os.path.exists(ddir):
-                for object in bpy.context.scene.objects:
-                    print(object.name)
-                    if object.name in ['Camera']:
-                        object.select_set(False)
-                        continue
-                    else:
-                        object.select_set(True)
-                bpy.ops.object.delete()
-                continue
+            cur_obj = bpy.data.objects[model_id] #bpy.context.selected_objects[0]
 
 
             # some bugs in blender freestyle rendering (camera views not sync)
@@ -244,9 +235,6 @@ def render_function(model_dir):
                 stepsize = 360.0 / v_num   # 45 degrees
                 for i in range(v_num):
                     print("Rotation {}, {}".format((stepsize * i), radians(stepsize * i)))
-                    save_dir = os.path.join(args.output_folder, model_id)
-                    if os.path.exists(save_dir) == False:
-                        os.makedirs(save_dir)
                     
                     # scene.render.filepath = os.path.join(save_dir, 'image_' + '{0:02d}'.format(int(i * stepsize)))                              # rgb
                     # scene.render.filepath = os.path.join(save_dir, 'o'+'{0:02d}'.format(j*4+i))                            # rgb
@@ -257,15 +245,16 @@ def render_function(model_dir):
                     # sc_file_output.file_slots[0].path = os.path.join(save_dir, 'sc_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # sc
                     # fs_output.file_slots[0].path = os.path.join(save_dir, 'hh_' + '{0:03d}'.format(int(i * stepsize)) + '_')         # fs
                     
-                    fs_output.file_slots[0].path = os.path.join(save_dir, '{0:02d}.png'.format(j*4+i))
+                    fs_output.file_slots[0].path = os.path.join(save_dir, '{0:02d}_#.png'.format(j*4+i))
 
-
-                    bpy.ops.render.render(write_still=True)  # render still
+                    bpy.ops.render.render(animation=False, write_still=True, layer='Freestyle')  # render still
                     # b_empty.rotation_euler[2] += radians(stepsize)
                     cur_obj.rotation_euler[j] += radians(stepsize)
 
                 cur_obj.rotation_euler[j] += radians(30)
                 # break
+            for i in range(12):
+                os.system('mv %s %s'%(os.path.join(save_dir, '{0:02d}_1.png'.format(i)),os.path.join(save_dir, '{0:02d}.png'.format(i))))
             
             # clear sys
             # obj = bpy.context.selected_objects[0]
@@ -280,7 +269,6 @@ def render_function(model_dir):
                     object.select_set(True)
             bpy.ops.object.delete() 
 
-
             # input('debug')
 
 ###### render model images
@@ -291,7 +279,7 @@ if __name__ == '__main__':
                         help='number of views to be rendered')
     # parser.add_argument('input_folder', type=str,
     #                     help='The path to where obj file and texture file stored')
-    parser.add_argument('--output_folder', type=str, default='/render2',
+    parser.add_argument('--output_folder', type=str, default='render',
                         help='The path the output will be dumped to.')
     parser.add_argument('--number_process', type=int, default=12,
                         help='number of multi-processing.')
@@ -311,5 +299,5 @@ if __name__ == '__main__':
     argv = sys.argv[sys.argv.index("--") + 1:]
     args = parser.parse_args(argv)
 
-    model_dir = './data/SHREC2014/models_std'
+    model_dir = 'norm_part/'
     render_function(model_dir)
