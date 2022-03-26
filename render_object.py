@@ -36,12 +36,12 @@ def render_function(model_dir):
     # bpy.context.scene.render.layers["RenderLayer"].use_pass_environment = True
     # bpy.context.scene.render.layers["RenderLayer"].use_pass_z = True
 
-    bpy.context.scene.view_layers["ViewLayer"].use_pass_normal = True
-    bpy.context.scene.view_layers["ViewLayer"].use_pass_environment = True
-    bpy.context.scene.view_layers["ViewLayer"].use_pass_z = True
-    bpy.context.scene.view_layers["ViewLayer"].use_freestyle = True
-    bpy.context.scene.view_layers["ViewLayer"].freestyle_settings.use_suggestive_contours = True
-    bpy.context.scene.view_layers["ViewLayer"].freestyle_settings.as_render_pass = True
+    bpy.context.scene.view_layers["View Layer"].use_pass_normal = True
+    bpy.context.scene.view_layers["View Layer"].use_pass_environment = True
+    bpy.context.scene.view_layers["View Layer"].use_pass_z = True
+    bpy.context.scene.view_layers["View Layer"].use_freestyle = True
+    bpy.context.scene.view_layers["View Layer"].freestyle_settings.use_suggestive_contours = True
+    bpy.context.scene.view_layers["View Layer"].freestyle_settings.as_render_pass = True
     
     # bpy.context.scene.cycles.device = 'GPU'
     # bpy.context.preferences.addons['cycles'].preferences.compute_device_type = 'CUDA'
@@ -129,7 +129,17 @@ def render_function(model_dir):
     
 
     ## render
-    cats = os.listdir(model_dir)
+    cats = []
+    if os.path.exists(os.path.join(model_dir, "train.txt")):
+        with open(os.path.join(model_dir, "train.txt")) as f:
+            for cat in f.readlines():
+                cat = cat.rstrip()
+                if len(cat) <= 0:
+                    continue
+                cats.append(cat)
+    else:
+        cats = os.listdir(model_dir)
+    print("cats:",cats)
     # model_ids = os.listdir(model_dir)[::-1]
     # model_ids = os.listdir(model_dir)[8000:8500]
     # model_ids = os.listdir(model_dir)[8500:9000]
@@ -225,7 +235,6 @@ def render_function(model_dir):
                     # render image by views
                     pose_dict = {}
 
-                    print(bpy.data.objects.keys())
                     cur_obj = bpy.data.objects[part_file] #bpy.context.selected_objects[0]
 
 
@@ -256,7 +265,9 @@ def render_function(model_dir):
                             
                             fs_output.file_slots[0].path = os.path.join(save_dir, '{0:02d}_#.png'.format(j*4+i))
 
+                            print("debug!")
                             bpy.ops.render.render(animation=False, write_still=True, layer='Freestyle')  # render still
+                            print("debug")
                             # b_empty.rotation_euler[2] += radians(stepsize)
                             cur_obj.rotation_euler[j] += radians(stepsize)
 
@@ -288,7 +299,7 @@ if __name__ == '__main__':
                         help='number of views to be rendered')
     # parser.add_argument('input_folder', type=str,
     #                     help='The path to where obj file and texture file stored')
-    parser.add_argument('--output_folder', type=str, default='render',
+    parser.add_argument('--output_folder', type=str, default='/mnt/3/yangjie/data/structurenet_hire/render',
                         help='The path the output will be dumped to.')
     parser.add_argument('--number_process', type=int, default=12,
                         help='number of multi-processing.')
@@ -308,6 +319,6 @@ if __name__ == '__main__':
     argv = sys.argv[sys.argv.index("--") + 1:]
     args = parser.parse_args(argv)
 
-    # model_dir = '/mnt/3/yangjie/data/structurenet_hire'
-    model_dir = 'data'
+    model_dir = '/mnt/3/yangjie/data/structurenet_hire'
+    # model_dir = 'data'
     render_function(model_dir)
